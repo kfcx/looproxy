@@ -3,14 +3,12 @@
     "command": "pip3 install --user -r requirements.txt",
     "includeFiles": ["requirements.txt"]
   },
-  "start": {
-    "command": "bash start.sh",
-    "shellType": "bash"
-  },
+  "start": "python3 main.py",
   "watch": {
     "ignore": [
       "\\.pyc$",
       "__pycache__",
+      "node_modules",
       "\\.git",
     ],
     "install": {
@@ -22,9 +20,6 @@
       "include": [
         "\\.py$",
         "^start\\.sh",
-      ],
-      "exclude": [
-        "^\\."
       ]
     },
     "throttle": 1000
