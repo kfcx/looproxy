@@ -16,7 +16,7 @@ def function_to_run():
         except:
             print("Failed to keep alive")
             count += 1
-        time.sleep(100)
+        time.sleep(int(os.environ.get('SLEEPSECOND', 100)))
 
 thread = threading.Thread(target=function_to_run)
 thread.start()
