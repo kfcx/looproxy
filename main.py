@@ -51,30 +51,7 @@ class Settings(BaseSettings):
 
 
 settings = Settings()
-http_client: AsyncClient = None
-
-
-@asynccontextmanager
-async def lifespan(app: FastAPI):
-    global http_client
-    print("Starting up HTTP client...")
-    http_client = AsyncClient(
-        timeout=Timeout(settings.REQUEST_TIMEOUT_MS / 1000),
-        follow_redirects=True,
-        http2=True,
-        limits=httpx.Limits(max_keepalive_connections=50, max_connections=100)
-    )
-
-    yield
-
-    print("Shutting down HTTP client...")
-    await http_client.aclose()
-
-
-app = FastAPI(
-    title="Proxy Service",
-    lifespan=lifespan
-)
+app = FastAPI(title="Proxy Service")
 app.add_middleware(
     CORSMiddleware,
     allow_origins=["*"],
@@ -84,12 +61,18 @@ app.add_middleware(
 )
 
 
+async def get_http_client():
+    return AsyncClient(
+        timeout=Timeout(settings.REQUEST_TIMEOUT_MS / 1000),
+        follow_redirects=True,
+        http2=True,
+        limits=httpx.Limits(max_keepalive_connections=50, max_connections=100)
+    )
+
+
 async def proxy_request(request: Request) -> Response:
     loop_count = int(request.headers.get(settings.LOOP_COUNT, '0'))
-    print(request)
     encoded_proxy_chain = request.headers.get(settings.PROXY_CHAIN)
-    print(loop_count)
-    print(encoded_proxy_chain)
 
     if loop_count > settings.MAX_PROXY_DEPTH:
         raise HTTPException(
@@ -98,7 +81,6 @@ async def proxy_request(request: Request) -> Response:
         )
 
     proxy_chain = json.loads(base64.b64decode(encoded_proxy_chain)) if encoded_proxy_chain else []
-    print(proxy_chain)
     target_url = request.headers.get(settings.TARGET_URL)
 
     if proxy_chain:
@@ -120,15 +102,16 @@ async def proxy_request(request: Request) -> Response:
         }
 
     proxy_headers['host'] = urlparse(target_url).netloc
-    print(proxy_headers)
+
     try:
         content = await request.body()
-        response = await http_client.request(
-            method=request.method,
-            url=target_url,
-            headers=proxy_headers,
-            content=content,
-        )
+        async with await get_http_client() as client:
+            response = await client.request(
+                method=request.method,
+                url=target_url,
+                headers=proxy_headers,
+                content=content,
+            )
 
         return Response(
             content=response.content,
@@ -148,10 +131,7 @@ async def handle_request(request: Request, path: str):
 
 @app.get("/health")
 async def health_check():
-    return {
-        "status": "healthy",
-        "client_status": "connected" if http_client else "disconnected"
-    }
+    return {"status": "healthy"}
 
 
 if __name__ == "__main__":
