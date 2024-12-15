@@ -28,9 +28,5 @@
       ]
     },
     "throttle": 1000
-  },
-  "hooks": {
-    "pre-start": "python3 -m pip install --upgrade pip",
-    "post-install": "python3 -c 'import sys; print(sys.version)'"
   }
 }
