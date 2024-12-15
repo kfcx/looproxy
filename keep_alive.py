@@ -16,7 +16,7 @@ def function_to_run():
         except:
             print("Failed to keep alive")
             count += 1
-        time.sleep(180)  # 每3分钟请求一次
+        time.sleep(100)
 
 thread = threading.Thread(target=function_to_run)
 thread.start()
