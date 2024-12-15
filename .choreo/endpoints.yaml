@@ -5,4 +5,5 @@ endpoints:
     port: 8000
     type: REST
     networkVisibility: Public
-    context: /*
+    context: /
+    schemaFilePath: openapi.yaml
