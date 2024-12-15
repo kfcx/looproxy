@@ -141,16 +141,16 @@ async def proxy_request(request: Request) -> Response:
         raise HTTPException(status_code=500, detail=str(e))
 
 
+@app.get("/health")
+async def health_check():
+    return {"status": "healthy"}
+
+
 @app.api_route("/{path:path}", methods=["GET", "POST", "PUT", "DELETE", "PATCH", "HEAD", "OPTIONS"])
 async def handle_request(request: Request, path: str):
     if settings.HASH_AUTH not in request.headers:
         return Response(status_code=444)
     return await proxy_request(request)
-
-
-@app.get("/health")
-async def health_check():
-    return {"status": "healthy"}
 
 
 if __name__ == "__main__":
