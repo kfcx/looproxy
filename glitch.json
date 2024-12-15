@@ -1,8 +1,5 @@
 {
-  "install": {
-    "command": "pip3 install --user -r requirements.txt",
-    "includeFiles": ["requirements.txt"]
-  },
+  "install": "pip3 install --user -r requirements.txt",
   "start": "python3 main.py",
   "watch": {
     "ignore": [
