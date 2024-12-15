@@ -157,7 +157,6 @@ if __name__ == "__main__":
         "app": "main:app",
         "host": "0.0.0.0",
         "port": 8080,
-        "http": "httptools",
         "proxy_headers": True,
         "forwarded_allow_ips": "*",
         "access_log": False,
@@ -165,6 +164,7 @@ if __name__ == "__main__":
     if platform.system().lower() != "windows":
         config.update({
             "loop": "uvloop",
+            "http": "httptools",
         })
 
     uvicorn.run(**config)
