@@ -159,7 +159,7 @@ if __name__ == "__main__":
     config = {
         "app": "main:app",
         "host": "0.0.0.0",
-        "port": 8080,
+        "port": 8000,
         "proxy_headers": True,
         "forwarded_allow_ips": "*",
         "access_log": False,
