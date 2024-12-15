@@ -22,6 +22,11 @@ COPY main.py .
 COPY keep_alive.py .
 COPY .env .
 
+RUN addgroup -g 10016 user && \
+    adduser  --disabled-password  --no-create-home --uid 10016 --ingroup user user1
+
+USER 10016
+
 # 暴露端口
 EXPOSE 8000
 
