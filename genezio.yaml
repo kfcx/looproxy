@@ -1,27 +1,15 @@
-# The name of the project.
-name: fastapi-app
+backend:
+    functions:
+        - entry: main.py
+          handler: app
+          name: function-express
+          path: .
+          type: httpServer
+    language:
+        name: python
+        packageManager: pip
+    path: .
+name: looproxy
 # The region where the project is deployed. Available regions: us-east-1, eu-central-1
 region: us-east-1
-# The version of the Genezio YAML configuration to parse.
 yamlVersion: 2
-backend:
-  # The root directory of the backend.
-  path: ./
-  # Information about the backend's programming language.
-  language:
-    # The name of the programming language.
-    name: python
-    # The package manager used by the backend.
-    packageManager: pip
-  # Information about the backend's functions.
-  functions:
-    # The name (label) of the function.
-    - name: looproxy
-      # The path to the function's code.
-      path: ./
-      # The name of the wsgi application.
-      handler: app
-      # The entry point for the function.
-      entry: main.py
-      # The type of the function.
-      type: httpServer
