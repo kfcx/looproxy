@@ -1,12 +1,17 @@
 {
-  "install": "pip3 install --user -r requirements.txt",
-  "start": "python3 main.py",
+  "install": {
+    "command": "pip3 install --user -r requirements.txt",
+    "includeFiles": ["requirements.txt"]
+  },
+  "start": {
+    "command": "bash start.sh",
+    "shellType": "bash"
+  },
   "watch": {
     "ignore": [
       "\\.pyc$",
       "__pycache__",
-      "node_modules",
-      ".git"
+      "\\.git",
     ],
     "install": {
       "include": [
@@ -16,9 +21,16 @@
     "restart": {
       "include": [
         "\\.py$",
-        "^start\\.sh"
+        "^start\\.sh",
+      ],
+      "exclude": [
+        "^\\."
       ]
     },
     "throttle": 1000
+  },
+  "hooks": {
+    "pre-start": "python3 -m pip install --upgrade pip",
+    "post-install": "python3 -c 'import sys; print(sys.version)'"
   }
 }
