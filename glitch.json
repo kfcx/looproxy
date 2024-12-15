@@ -6,7 +6,7 @@
       "\\.pyc$",
       "__pycache__",
       "node_modules",
-      "\\.git",
+      ".git"
     ],
     "install": {
       "include": [
@@ -16,7 +16,7 @@
     "restart": {
       "include": [
         "\\.py$",
-        "^start\\.sh",
+        "^start\\.sh"
       ]
     },
     "throttle": 1000
