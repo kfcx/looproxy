@@ -22,6 +22,7 @@ class Settings(BaseSettings):
     HASH_AUTH: str = os.environ.get("HashAuth", 'xxx-xxx')
 
     HEADERS_TO_DELETE: set = {
+        'sozu-id',
         'traceparent',
         'x-amzn-trace-id',
         'cdn-loop',
