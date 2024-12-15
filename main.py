@@ -86,7 +86,10 @@ app.add_middleware(
 
 async def proxy_request(request: Request) -> Response:
     loop_count = int(request.headers.get(settings.LOOP_COUNT, '0'))
+    print(request)
     encoded_proxy_chain = request.headers.get(settings.PROXY_CHAIN)
+    print(loop_count)
+    print(encoded_proxy_chain)
 
     if loop_count > settings.MAX_PROXY_DEPTH:
         raise HTTPException(
@@ -95,6 +98,7 @@ async def proxy_request(request: Request) -> Response:
         )
 
     proxy_chain = json.loads(base64.b64decode(encoded_proxy_chain)) if encoded_proxy_chain else []
+    print(proxy_chain)
     target_url = request.headers.get(settings.TARGET_URL)
 
     if proxy_chain:
@@ -116,7 +120,7 @@ async def proxy_request(request: Request) -> Response:
         }
 
     proxy_headers['host'] = urlparse(target_url).netloc
-
+    print(proxy_headers)
     try:
         content = await request.body()
         response = await http_client.request(
