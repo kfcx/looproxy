@@ -20,7 +20,7 @@ class Settings(BaseSettings):
     TARGET_URL: str = 'x-target-url'
     HASH_AUTH: str = os.environ.get("HashAuth", 'xxx-xxx')
 
-    HEADERS_TO_DELETE: tuple = (
+    HEADERS_TO_DELETE: set = {
         'traceparent',
         'x-amzn-trace-id',
         'cdn-loop',
@@ -35,16 +35,34 @@ class Settings(BaseSettings):
         'x-real-ip',
         'forwarded',
         'client-ip',
-    )
+        'x-max-bytecode-size',
+        'x-min-bytecode-size',
+        'x-vercel-deployment-url',
+        'x-vercel-forwarded-for',
+        'x-vercel-id',
+        'x-vercel-internal-ingress-bucket',
+        'x-vercel-internal-intra-session',
+        'x-vercel-ip-as-number',
+        'x-vercel-ip-city',
+        'x-vercel-ip-continent',
+        'x-vercel-ip-country',
+        'x-vercel-ip-latitude',
+        'x-vercel-ip-longitude',
+        'x-vercel-ip-timezone',
+        'x-vercel-ja4-digest',
+        'x-vercel-proxied-for',
+        'x-vercel-proxy-signature',
+        'x-vercel-proxy-signature-ts'
+    }
 
     @property
     def CONFIG_TO_DELETE(self):
-        return (
+        return {
             self.HASH_AUTH,
             self.PROXY_CHAIN,
             self.TARGET_URL,
-            self.LOOP_COUNT,
-        ) + self.HEADERS_TO_DELETE
+            self.LOOP_COUNT
+        } | self.HEADERS_TO_DELETE
 
     class Config:
         case_sensitive = True
