@@ -54,11 +54,9 @@ class Settings(BaseSettings):
         'x-vercel-ja4-digest',
         'x-vercel-proxied-for',
         'x-vercel-proxy-signature',
-        'x-vercel-proxy-signature-ts'
-        "x-vercel-ip-country-region",
         "x-vercel-ip-postal-code",
-        "X-Vercel-Proxy-Signature-Ts",
-        "X-Vercel-Ip-Country-Region",
+        # "X-Vercel-Proxy-Signature-Ts",
+        # "X-Vercel-Ip-Country-Region",
     }
 
     @property
