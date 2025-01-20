@@ -152,7 +152,7 @@ async def health_check():
 @app.api_route("/{path:path}", methods=["GET", "POST", "PUT", "DELETE", "PATCH", "HEAD", "OPTIONS"])
 async def handle_request(request: Request, path: str):
     if settings.HASH_AUTH not in request.headers:
-        return Response(status_code=444)
+        return Response(content="looproxy is running.", status_code=444)
     return await proxy_request(request)
 
 
