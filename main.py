@@ -57,7 +57,7 @@ class Settings(BaseSettings):
         'x-vercel-proxy-signature-ts'
         "x-vercel-ip-country-region",
         "x-vercel-ip-postal-code",
-        "x-vercel-proxy-signature-ts",
+        "X-Vercel-Proxy-Signature-Ts",
     }
 
     @property
