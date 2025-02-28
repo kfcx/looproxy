@@ -19,7 +19,7 @@ class Settings(BaseSettings):
     PROXY_CHAIN: str = 'x-proxy-chain'
     LOOP_COUNT: str = 'x-loop-count'
     TARGET_URL: str = 'x-target-url'
-    HASH_AUTH: str = os.environ.get("HashAuth", 'xxx-xxx')
+    HASH_AUTH: str = os.environ.get("HashAuth")
 
     HEADERS_TO_DELETE: set = {
         'sozu-id',
@@ -151,8 +151,8 @@ async def health_check():
 
 @app.api_route("/{path:path}", methods=["GET", "POST", "PUT", "DELETE", "PATCH", "HEAD", "OPTIONS"])
 async def handle_request(request: Request, path: str):
-    if settings.HASH_AUTH not in request.headers:
-        return Response(content="looproxy is running.", status_code=444)
+    if settings.HASH_AUTH and settings.HASH_AUTH not in request.headers:
+        return Response(content="looproxy is running.", status_code=200)
     return await proxy_request(request)
 
 
