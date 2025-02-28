@@ -1,5 +1,11 @@
 # LoopProxy
 
+中文 | [English](README_EN.md)
+
+<a name="README.md"></a>
+
+## LoopProxy
+
 LoopProxy 是一个轻量级、高性能的 HTTP 代理服务，支持链式代理转发，适用于复杂网络环境下的请求路由。
 
 ## 特性
