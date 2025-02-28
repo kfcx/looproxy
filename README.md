@@ -17,6 +17,29 @@ LoopProxy 是一个轻量级、高性能的 HTTP 代理服务，支持链式代�
 - **HTTP/2 支持**：基于 httpx 客户端，支持 HTTP/2 协议
 - **健康检查**：提供 `/health` 端点监控服务状态
 
+# LoopProxy - 链式代理服务
+
+LoopProxy是一个允许请求通过一系列代理服务器链式传递的服务。
+
+## 工作流程
+
+以下流程图展示了LoopProxy如何处理代理请求：
+
+```mermaid
+%%{init: {'theme': 'base', 'themeVariables': { 'fontSize': '10px' }}}%%
+flowchart LR
+    A[客户端] --> B[LoopProxy]
+    B --> C{解析代理链}
+    C -->|无链| D[直接转发]
+    C -->|有链| E[链式转发]
+    E --> F{检查深度}
+    F -->|超限| G[错误]
+    F -->|正常| H[转发到下一代理]
+    D --> I[目标服务器]
+    H --> I
+    I --> A
+```
+
 ## 环境变量配置
 
 | 环境变量 | 描述 | 默认值 |
