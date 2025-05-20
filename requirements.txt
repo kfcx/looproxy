@@ -8,6 +8,7 @@ uvicorn[standard]
 python-multipart
 brotli
 zstandard
+curl_cffi
 
 uvloop>=0.17.0; platform_system != "Windows"
 httptools>=0.5.0; platform_system != "Windows"
