@@ -122,6 +122,7 @@ async def proxy_request(request: Request) -> Response:
                     url=next_target,
                     headers=forward_headers,
                     data=body,
+                    impersonate="chrome124",
                     timeout=settings.REQUEST_TIMEOUT_MS / 1000
                 )
 
@@ -150,7 +151,7 @@ if __name__ == "__main__":
     import platform
 
     config = {
-        "app": "loop2:app",
+        "app": "main:app",
         "host": "0.0.0.0",
         "port": 8000,
         "proxy_headers": True,
