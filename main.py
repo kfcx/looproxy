@@ -2,7 +2,7 @@ import os
 import json
 import base64
 import asyncio
-
+import keep_alive
 import httpx
 import uvicorn
 from urllib.parse import urlparse, urlunparse
@@ -80,21 +80,17 @@ async def proxy_request(request: Request) -> Response:
         raise HTTPException(status_code=400, detail="Invalid x-proxy-chain header")
 
     target_url = request.headers.get(settings.TARGET_URL)
-    forward_headers = {}
 
     if proxy_chain:
-
         forward_headers = {
             k: v for k, v in request.headers.items()
             if k.lower() not in settings.HEADERS_TO_DELETE
         }
         forward_headers[settings.LOOP_COUNT] = str(loop_count + 1)
-
         next_target = proxy_chain.pop(0)
         if proxy_chain:
             forward_headers[settings.PROXY_CHAIN] = base64.b64encode(json.dumps(proxy_chain).encode()).decode()
     else:
-
         forward_headers = {
             k: v for k, v in request.headers.items()
             if k.lower() not in settings.CONFIG_TO_DELETE
@@ -105,18 +101,8 @@ async def proxy_request(request: Request) -> Response:
         raise HTTPException(status_code=400, detail="Missing x-target-url header for final hop")
 
     parsed = urlparse(next_target)
-    path = request.url.path
-    query = request.url.query
-    rebuilt = urlunparse((
-        parsed.scheme,
-        parsed.netloc,
-        parsed.path.rstrip('/') + path,
-        '', '', query
-    ))
     forward_headers['host'] = parsed.netloc
-
     forward_headers.pop(settings.HTTP_TYPE, None)
-
     body = await request.body()
     use_httpx = request.headers.get(settings.HTTP_TYPE, 'curl').lower() == 'httpx'
 
@@ -125,7 +111,7 @@ async def proxy_request(request: Request) -> Response:
             async with await get_http_client() as client:
                 resp = await client.request(
                     method=request.method,
-                    url=rebuilt,
+                    url=next_target,
                     headers=forward_headers,
                     content=body,
                 )
@@ -133,7 +119,7 @@ async def proxy_request(request: Request) -> Response:
             def sync_call():
                 return curl_requests.request(
                     method=request.method,
-                    url=rebuilt,
+                    url=next_target,
                     headers=forward_headers,
                     data=body,
                     timeout=settings.REQUEST_TIMEOUT_MS / 1000
@@ -142,10 +128,8 @@ async def proxy_request(request: Request) -> Response:
             resp = await asyncio.get_event_loop().run_in_executor(None, sync_call)
 
         status, content, resp_headers = resp.status_code, resp.content, resp.headers
-
         resp_headers_dict = {k: v for k, v in resp_headers.items() if k.lower() != 'content-length'}
         return Response(content=content, status_code=status, headers=resp_headers_dict)
-
     except Exception as e:
         raise HTTPException(status_code=502, detail="Bad Gateway")
 
