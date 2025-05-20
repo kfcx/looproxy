@@ -1,79 +1,55 @@
 import os
 import json
 import base64
+import asyncio
+
 import httpx
 import uvicorn
-import keep_alive
-
-from contextlib import asynccontextmanager
+from urllib.parse import urlparse, urlunparse
+from curl_cffi import requests as curl_requests
 from fastapi import FastAPI, Request, Response, HTTPException
 from fastapi.middleware.cors import CORSMiddleware
 from httpx import AsyncClient, Timeout
 from pydantic import BaseSettings
-from urllib.parse import urlparse
 
 
 class Settings(BaseSettings):
-    MAX_PROXY_DEPTH: int = os.environ.get("MAX_PROXY_DEPTH", 5)
-    REQUEST_TIMEOUT_MS: int = os.environ.get("REQUEST_TIMEOUT_MS", 8000)
+    MAX_PROXY_DEPTH: int = int(os.getenv("MAX_PROXY_DEPTH", 5))
+    REQUEST_TIMEOUT_MS: int = int(os.getenv("REQUEST_TIMEOUT_MS", 60000))
     PROXY_CHAIN: str = 'x-proxy-chain'
     LOOP_COUNT: str = 'x-loop-count'
     TARGET_URL: str = 'x-target-url'
-    HASH_AUTH: str = os.environ.get("HashAuth")
+    HASH_AUTH: str = (os.getenv("HashAuth") or "").lower()
+    HTTP_TYPE: str = 'x-http'
 
     HEADERS_TO_DELETE: set = {
-        'sozu-id',
-        'traceparent',
-        'x-amzn-trace-id',
-        'cdn-loop',
-        'cf-connecting-ip',
-        'cf-ew-via',
-        'cf-ray',
-        'cf-visitor',
-        'cf-worker',
-        'cf-ipcountry',
-        'x-forwarded-for',
-        'x-forwarded-host',
-        'x-real-ip',
-        'forwarded',
-        'client-ip',
-        'x-max-bytecode-size',
-        'x-min-bytecode-size',
-        'x-vercel-deployment-url',
-        'x-vercel-forwarded-for',
-        'x-vercel-id',
-        'x-vercel-internal-ingress-bucket',
-        'x-vercel-internal-intra-session',
-        'x-vercel-ip-as-number',
-        'x-vercel-ip-city',
-        'x-vercel-ip-continent',
-        'x-vercel-ip-country',
-        'x-vercel-ip-latitude',
-        'x-vercel-ip-longitude',
-        'x-vercel-ip-timezone',
-        'x-vercel-ja4-digest',
-        'x-vercel-proxied-for',
-        'x-vercel-proxy-signature',
-        "x-vercel-ip-postal-code",
-        # "X-Vercel-Proxy-Signature-Ts",
-        # "X-Vercel-Ip-Country-Region",
+        'sozu-id', 'traceparent', 'x-amzn-trace-id', 'cdn-loop',
+        'cf-connecting-ip', 'cf-ew-via', 'cf-ray', 'cf-visitor',
+        'cf-worker', 'cf-ipcountry', 'x-forwarded-for', 'x-forwarded-host',
+        'x-real-ip', 'forwarded', 'client-ip', 'x-max-bytecode-size',
+        'x-min-bytecode-size', 'x-vercel-deployment-url', 'x-vercel-forwarded-for',
+        'x-vercel-id', 'x-vercel-internal-ingress-bucket', 'x-vercel-internal-intra-session',
+        'x-vercel-ip-as-number', 'x-vercel-ip-city', 'x-vercel-ip-continent',
+        'x-vercel-ip-country', 'x-vercel-ip-latitude', 'x-vercel-ip-longitude',
+        'x-vercel-ip-timezone', 'x-vercel-ja4-digest', 'x-vercel-proxied-for',
+        'x-vercel-proxy-signature', 'x-vercel-ip-postal-code',
+        # custom header for choosing http lib
+        'x-http',
     }
 
     @property
-    def CONFIG_TO_DELETE(self):
+    def CONFIG_TO_DELETE(self) -> set:
         return {
             self.HASH_AUTH,
             self.PROXY_CHAIN,
             self.TARGET_URL,
-            self.LOOP_COUNT
+            self.LOOP_COUNT,
+            self.HTTP_TYPE,
         } | self.HEADERS_TO_DELETE
-
-    class Config:
-        case_sensitive = True
 
 
 settings = Settings()
-app = FastAPI(title="Proxy Service")
+app = FastAPI(title="Chain Proxy Service")
 app.add_middleware(
     CORSMiddleware,
     allow_origins=["*"],
@@ -83,7 +59,7 @@ app.add_middleware(
 )
 
 
-async def get_http_client():
+async def get_http_client() -> AsyncClient:
     return AsyncClient(
         timeout=Timeout(settings.REQUEST_TIMEOUT_MS / 1000),
         follow_redirects=True,
@@ -94,65 +70,95 @@ async def get_http_client():
 
 async def proxy_request(request: Request) -> Response:
     loop_count = int(request.headers.get(settings.LOOP_COUNT, '0'))
-    encoded_proxy_chain = request.headers.get(settings.PROXY_CHAIN)
+    if loop_count >= settings.MAX_PROXY_DEPTH:
+        raise HTTPException(status_code=400, detail=f"Proxy depth exceeds maximum ({settings.MAX_PROXY_DEPTH})")
 
-    if loop_count > settings.MAX_PROXY_DEPTH:
-        raise HTTPException(
-            status_code=400,
-            detail=f"Proxy depth exceeds maximum limit ({settings.MAX_PROXY_DEPTH})"
-        )
+    encoded_chain = request.headers.get(settings.PROXY_CHAIN)
+    try:
+        proxy_chain = json.loads(base64.b64decode(encoded_chain)) if encoded_chain else []
+    except Exception:
+        raise HTTPException(status_code=400, detail="Invalid x-proxy-chain header")
 
-    proxy_chain = json.loads(base64.b64decode(encoded_proxy_chain)) if encoded_proxy_chain else []
     target_url = request.headers.get(settings.TARGET_URL)
+    forward_headers = {}
 
     if proxy_chain:
-        proxy_headers = {
+
+        forward_headers = {
             k: v for k, v in request.headers.items()
             if k.lower() not in settings.HEADERS_TO_DELETE
         }
-        proxy_headers[settings.LOOP_COUNT] = str(loop_count + 1)
-        target_url = proxy_chain.pop(0)
+        forward_headers[settings.LOOP_COUNT] = str(loop_count + 1)
 
+        next_target = proxy_chain.pop(0)
         if proxy_chain:
-            proxy_headers[settings.PROXY_CHAIN] = base64.b64encode(
-                json.dumps(proxy_chain).encode()
-            ).decode()
+            forward_headers[settings.PROXY_CHAIN] = base64.b64encode(json.dumps(proxy_chain).encode()).decode()
     else:
-        proxy_headers = {
+
+        forward_headers = {
             k: v for k, v in request.headers.items()
             if k.lower() not in settings.CONFIG_TO_DELETE
         }
+        next_target = target_url
 
-    proxy_headers['host'] = urlparse(target_url).netloc
+    if not next_target:
+        raise HTTPException(status_code=400, detail="Missing x-target-url header for final hop")
+
+    parsed = urlparse(next_target)
+    path = request.url.path
+    query = request.url.query
+    rebuilt = urlunparse((
+        parsed.scheme,
+        parsed.netloc,
+        parsed.path.rstrip('/') + path,
+        '', '', query
+    ))
+    forward_headers['host'] = parsed.netloc
+
+    forward_headers.pop(settings.HTTP_TYPE, None)
+
+    body = await request.body()
+    use_httpx = request.headers.get(settings.HTTP_TYPE, 'curl').lower() == 'httpx'
 
     try:
-        content = await request.body()
-        async with await get_http_client() as client:
-            response = await client.request(
-                method=request.method,
-                url=target_url,
-                headers=proxy_headers,
-                content=content,
-            )
+        if use_httpx:
+            async with await get_http_client() as client:
+                resp = await client.request(
+                    method=request.method,
+                    url=rebuilt,
+                    headers=forward_headers,
+                    content=body,
+                )
+        else:
+            def sync_call():
+                return curl_requests.request(
+                    method=request.method,
+                    url=rebuilt,
+                    headers=forward_headers,
+                    data=body,
+                    timeout=settings.REQUEST_TIMEOUT_MS / 1000
+                )
 
-        return Response(
-            content=response.content,
-            status_code=response.status_code,
-            headers=dict(response.headers)
-        )
+            resp = await asyncio.get_event_loop().run_in_executor(None, sync_call)
+
+        status, content, resp_headers = resp.status_code, resp.content, resp.headers
+
+        resp_headers_dict = {k: v for k, v in resp_headers.items() if k.lower() != 'content-length'}
+        return Response(content=content, status_code=status, headers=resp_headers_dict)
+
     except Exception as e:
-        raise HTTPException(status_code=500, detail=str(e))
+        raise HTTPException(status_code=502, detail="Bad Gateway")
 
 
 @app.get("/health")
-async def health_check():
+async def health():
     return {"status": "healthy"}
 
 
-@app.api_route("/{path:path}", methods=["GET", "POST", "PUT", "DELETE", "PATCH", "HEAD", "OPTIONS"])
+@app.api_route("/{path:path}", methods=["GET", "POST", "PUT", "DELETE", "PATCH", "OPTIONS", "HEAD"])
 async def handle_request(request: Request, path: str):
     if settings.HASH_AUTH and settings.HASH_AUTH not in request.headers:
-        return Response(content="looproxy is running.", status_code=200)
+        raise HTTPException(status_code=403, detail="Missing authentication header")
     return await proxy_request(request)
 
 
@@ -160,7 +166,7 @@ if __name__ == "__main__":
     import platform
 
     config = {
-        "app": "main:app",
+        "app": "loop2:app",
         "host": "0.0.0.0",
         "port": 8000,
         "proxy_headers": True,
@@ -168,9 +174,5 @@ if __name__ == "__main__":
         "access_log": False,
     }
     if platform.system().lower() != "windows":
-        config.update({
-            "loop": "uvloop",
-            "http": "httptools",
-        })
-
+        config.update({"loop": "uvloop", "http": "httptools"})
     uvicorn.run(**config)
